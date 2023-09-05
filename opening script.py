@@ -2,6 +2,8 @@ import serial
 import cv2
 import mediapipe as mp
 import numpy as np
+import time
+
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -10,6 +12,8 @@ mp_pose = mp.solutions.pose
 port = serial.Serial(port='COM4', baudrate=115200, timeout=.1)
 
 cap = cv2.VideoCapture(0)
+
+starjumps, goal, pose = 0, 5, False
 
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     while cap.isOpened():
@@ -27,19 +31,28 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             right_hand_landmark = results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_WRIST]
             left_shoulder_landmark = results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_SHOULDER]
             right_shoulder_landmark = results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_SHOULDER]
+            left_hip_landmark = results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_HIP]
+            right_hip_landmark = results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_HIP]
             
-            if left_hand_landmark and right_hand_landmark and left_shoulder_landmark and right_shoulder_landmark:
-                left_hand_y = int(left_hand_landmark.y * height)
-                right_hand_y = int(right_hand_landmark.y * height)
-                left_shoulder_y = int(left_shoulder_landmark.y * height)
-                right_shoulder_y = int(right_shoulder_landmark.y * height)
-                
-                if left_hand_y < min(left_shoulder_y, right_shoulder_y):
-                    command = "open"
-                else:
-                    command = "close"
+
+            if (left_hand_landmark.y < left_hip_landmark.y and right_hand_landmark.y < right_hip_landmark.y):
+                newPose = False
+            elif (left_hand_landmark.y > left_shoulder_landmark.y and right_hand_landmark.y > right_shoulder_landmark.y):
+                newPose = True
+            
+            if (newPose != pose):
+                if (newPose):
+                    starjumps += 1
+                pose = newPose
         
         annotated_frame = frame.copy()
+
+        if goal <= starjumps:
+            command = "open"
+            time.sleep(15)
+            command = "close"
+            starjumps = 0
+
                 
         mp_drawing.draw_landmarks(
             annotated_frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
